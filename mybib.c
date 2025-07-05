@@ -190,6 +190,17 @@ void freeObjModel(ObjModel *obj) {
         obj->textures = NULL;
     }
     // O ponteiro `obj` em si não deve ser liberado aqui, pois ele é passado por referência.
+
+    // Liberar adjacência
+    if (obj->adjacency != NULL) {
+        for (int i = 0; i < obj->vertexCount; i++) {
+            if (obj->adjacency[i].neighbors != NULL) {
+                free(obj->adjacency[i].neighbors);
+            }
+        }
+        free(obj->adjacency);
+        obj->adjacency = NULL;
+    }
 }
 
 void geraBox(ObjModel *model) {
@@ -851,3 +862,81 @@ void AtualizaRotacao(GLfloat *mat, float angle, float x, float y, float z) {
 }
 
 
+void buildAdjacency(ObjModel* model) {
+    // Libera adjacências anteriores se existirem
+    if (model->adjacency != NULL) {
+        for (int i = 0; i < model->vertexCount; i++) {
+            if (model->adjacency[i].neighbors != NULL) {
+                free(model->adjacency[i].neighbors);
+            }
+        }
+        free(model->adjacency);
+    }
+
+    // Aloca memória para a estrutura de adjacência
+    model->adjacency = (Adjacency*)malloc(model->vertexCount * sizeof(Adjacency));
+    for (int i = 0; i < model->vertexCount; i++) {
+        model->adjacency[i].numNeighbors = 0;
+        model->adjacency[i].neighbors = NULL;
+    }
+
+    // Tabela temporária para armazenar vizinhos
+    int** tempNeighbors = (int**)malloc(model->vertexCount * sizeof(int*));
+    int* counts = (int*)calloc(model->vertexCount, sizeof(int));
+    int* capacities = (int*)malloc(model->vertexCount * sizeof(int));
+    
+    for (int i = 0; i < model->vertexCount; i++) {
+        capacities[i] = 10;
+        tempNeighbors[i] = (int*)malloc(capacities[i] * sizeof(int));
+    }
+
+    // Processa cada face para adicionar vizinhos
+    for (int i = 0; i < model->faceCount; i++) {
+        int idx[3] = {
+            model->faces[i].v1 - 1, // OBJ usa indexação 1-based
+            model->faces[i].v2 - 1,
+            model->faces[i].v3 - 1
+        };
+
+        // Adiciona relações de vizinhança para cada vértice do triângulo
+        for (int j = 0; j < 3; j++) {
+            int v = idx[j];
+            for (int k = 0; k < 3; k++) {
+                if (k == j) continue;
+                int neighbor = idx[k];
+                
+                // Verifica se já é vizinho
+                int exists = 0;
+                for (int n = 0; n < counts[v]; n++) {
+                    if (tempNeighbors[v][n] == neighbor) {
+                        exists = 1;
+                        break;
+                    }
+                }
+                
+                // Adiciona se não existir
+                if (!exists) {
+                    if (counts[v] >= capacities[v]) {
+                        capacities[v] *= 2;
+                        tempNeighbors[v] = realloc(tempNeighbors[v], capacities[v] * sizeof(int));
+                    }
+                    tempNeighbors[v][counts[v]++] = neighbor;
+                }
+            }
+        }
+    }
+
+    // Copia para a estrutura permanente
+    for (int i = 0; i < model->vertexCount; i++) {
+        model->adjacency[i].numNeighbors = counts[i];
+        if (counts[i] > 0) {
+            model->adjacency[i].neighbors = (int*)malloc(counts[i] * sizeof(int));
+            memcpy(model->adjacency[i].neighbors, tempNeighbors[i], counts[i] * sizeof(int));
+        }
+        free(tempNeighbors[i]);
+    }
+
+    free(tempNeighbors);
+    free(counts);
+    free(capacities);
+}

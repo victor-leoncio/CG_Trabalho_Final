@@ -228,6 +228,7 @@ void generatePerlinTerrain(ObjModel *model, TerrainParams params) {
     
     // Generate bounding box
     geraBox(model);
+    buildAdjacency(model);
     
     printf("Terreno Perlin gerado: %d vértices, %d faces\n", model->vertexCount, model->faceCount);
 }
@@ -394,6 +395,6 @@ void generateMountainousTerrain(ObjModel *model, TerrainParams params) {
     
     // Generate bounding box
     geraBox(model);
-    
+    buildAdjacency(model); 
     printf("Terreno montanhoso gerado: %d vértices, %d faces\n", model->vertexCount, model->faceCount);
 }

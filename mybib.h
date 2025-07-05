@@ -70,6 +70,11 @@ typedef struct Material {
 } Material;
 
 
+typedef struct Adjacency {
+    int numNeighbors;
+    int* neighbors;
+} Adjacency;
+
 typedef struct ObjModel {
     Vertex *vertices;
     TexCoord *texCoords;
@@ -77,6 +82,7 @@ typedef struct ObjModel {
     Vertex *normals;
     Material *materials;
     Texture *textures;
+    Adjacency* adjacency;
 
     int vertexCount;
     int texCoordCount;
@@ -106,7 +112,7 @@ typedef struct {
     int x,y;
 } Node;
 
-
+void buildAdjacency(ObjModel* model);
 void crossProduct(Vertex v1, Vertex v2, Vertex *result);
 void normalize(Vertex *v);
 Vertex barycentricCoord(Vertex v1, Vertex v2, Vertex v3);
@@ -143,5 +149,6 @@ void InicializaMatriz(GLfloat *mat);
 void MultiplicaMatriz(GLfloat *orig, GLfloat *mat);
 void GeraMatrizRotacao(float angle, float x, float y, float z, GLfloat *mat);
 void AtualizaRotacao(GLfloat *mat, float angle, float x, float y, float z);
+
 
 #endif // MYBIB_H

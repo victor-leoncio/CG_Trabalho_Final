@@ -1,6 +1,7 @@
 #include <GL/freeglut_std.h>
 #include <GL/gl.h>
 #include <GL/glut.h>
+#include <float.h>
 #include <stdio.h>
 #include <math.h>
 #include "mybib.h"
@@ -26,6 +27,125 @@ const GLfloat angle = 5.0f * M_PI / 180.0f;
 const GLfloat scale = 100.0f;
 
 
+// Variáveis globais
+GLboolean simulationActive = GL_FALSE;
+int* drainagePath = NULL;
+int pathLength = 0;
+int currentStep = 0;
+GLboolean showPath = GL_TRUE;
+GLboolean continuousAnimation = GL_TRUE;
+int animationSpeed = 100; // ms
+
+// Matrizes para unproject
+GLdouble modelview[16];
+GLdouble projection[16];
+GLint viewport[4];
+
+
+// Função timer
+void Timer(int value) {
+    if (simulationActive && continuousAnimation && currentStep < pathLength - 1) {
+        currentStep++;
+        glutPostRedisplay();
+        glutTimerFunc(animationSpeed, Timer, 0);
+    }
+}
+
+// Função para calcular o caminho de drenagem
+void calculateDrainagePath(int startVertex) {
+    // Libera caminho anterior
+    if (drainagePath != NULL) {
+        free(drainagePath);
+        drainagePath = NULL;
+    }
+
+    pathLength = 0;
+    currentStep = 0;
+    simulationActive = GL_TRUE;
+
+    int maxPathLength = 1000;
+    drainagePath = (int*)malloc(maxPathLength * sizeof(int));
+    drainagePath[pathLength++] = startVertex;
+
+    int current = startVertex;
+    while (pathLength < maxPathLength) {
+        int lowestNeighbor = -1;
+        float lowestY = meuModelo.vertices[current].y;
+
+        // Busca o vizinho mais baixo
+        for (int i = 0; i < meuModelo.adjacency[current].numNeighbors; i++) {
+            int neighbor = meuModelo.adjacency[current].neighbors[i];
+            float neighborY = meuModelo.vertices[neighbor].y;
+            
+            if (neighborY < lowestY) {
+                lowestY = neighborY;
+                lowestNeighbor = neighbor;
+            }
+        }
+
+        // Chegou a um mínimo local
+        if (lowestNeighbor == -1) break;
+
+        drainagePath[pathLength++] = lowestNeighbor;
+        current = lowestNeighbor;
+    }
+
+    // Inicia animação
+    if (continuousAnimation) {
+        glutTimerFunc(animationSpeed, Timer, 0);
+    }
+}
+// Função para encontrar o vértice mais próximo
+void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
+    float minDist = FLT_MAX;
+    int closestIndex = -1;
+
+    for (int i = 0; i < meuModelo.vertexCount; i++) {
+        Vertex v = meuModelo.vertices[i];
+        float dx = v.x - x;
+        float dy = v.y - y;
+        float dz = v.z - z;
+        float dist = dx*dx + dy*dy + dz*dz;
+        
+        if (dist < minDist) {
+            minDist = dist;
+            closestIndex = i;
+        }
+    }
+
+    if (closestIndex != -1) {
+        selectedVertexIndex = closestIndex;
+        calculateDrainagePath(closestIndex);
+    }
+}
+
+// Função de clique do mouse
+void Mouse(int button, int state, int x, int y) {
+    if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        
+        GLfloat winX = (GLfloat)x;
+        GLfloat winY = (GLfloat)viewport[3] - (GLfloat)y - 1;
+        GLfloat winZ;
+        
+        glReadPixels(x, (int)winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+        
+        GLdouble posX, posY, posZ;
+        gluUnProject(winX, winY, winZ,
+                     modelview, projection, viewport,
+                     &posX, &posY, &posZ);
+        
+        // Ajuste para coordenadas do modelo
+        posX /= scale;
+        posY /= scale;
+        posZ /= scale;
+        
+        findClosestVertex((GLfloat)posX, (GLfloat)posY, (GLfloat)posZ);
+        glutPostRedisplay();
+    }
+}
+
+
 void Desenha(void)
 {	
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -36,6 +156,30 @@ void Desenha(void)
     glScalef(scale, scale, scale);
 	drawModel(&meuModelo);
     glPopMatrix();
+
+    // Desenha o caminho de drenagem
+    if (showPath && drainagePath != NULL && pathLength > 0) {
+        glDisable(GL_LIGHTING);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_STRIP);
+        for (int i = 0; i <= currentStep; i++) {
+            Vertex v = meuModelo.vertices[drainagePath[i]];
+            glVertex3f(v.x * scale, v.y * scale + 0.1f, v.z * scale);
+        }
+        glEnd();
+        glEnable(GL_LIGHTING);
+    }
+
+    // Desenha a bola
+    if (simulationActive && drainagePath != NULL && pathLength > 0) {
+        Vertex v = meuModelo.vertices[drainagePath[currentStep]];
+        glPushMatrix();
+        glTranslatef(v.x * scale, v.y * scale + 0.5f, v.z * scale);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glutSolidSphere(1.5f, 20, 20);
+        glPopMatrix();
+    }
 
 	glFlush();
 	glutSwapBuffers();
@@ -75,6 +219,19 @@ void Inicializa (void)
         fprintf(stderr, "Erro ao carregar modelo OBJ/MTL\n");
         exit(1);
     }
+
+    buildAdjacency(&meuModelo);
+    
+    // Salva matrizes iniciais
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60, fAspect, 0.5, 500);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
     eye_x = 200;
     eye_y = 10;
@@ -244,6 +401,25 @@ void Teclado (unsigned char key, int x, int y)
             up_z = 0;
             ortho = GL_FALSE;
             break;
+
+        case ' ': // Avançar passo a passo
+            if (simulationActive && !continuousAnimation && currentStep < pathLength - 1) {
+                currentStep++;
+                glutPostRedisplay();
+            }
+            break;
+            
+        case 'c': // Alternar animação contínua
+            continuousAnimation = !continuousAnimation;
+            if (simulationActive && continuousAnimation && currentStep < pathLength - 1) {
+                glutTimerFunc(animationSpeed, Timer, 0);
+            }
+            break;
+            
+        case 'v': // Alternar visualização do caminho
+            showPath = !showPath;
+            glutPostRedisplay();
+            break;
     }
 
 	EspecificaParametrosVisualizacao();
@@ -260,6 +436,8 @@ int main(int argc, char **argv)
 	glutDisplayFunc(Desenha);
     glutReshapeFunc(AlteraTamanhoJanela);
     glutKeyboardFunc(Teclado);
+    glutMouseFunc(Mouse);
+    glutTimerFunc(animationSpeed, Timer, 0);
 	Inicializa();
 	glutMainLoop();
     freeObjModel(&meuModelo);
