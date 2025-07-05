@@ -341,7 +341,7 @@ void Inicializa (void)
     eye_y = 10;
     eye_z = 0;
     //center_x = -1000000000;
-    center_x = center_y = center_z = 1;
+    center_x = center_y = center_z = 0;
     up_x = 0;
     up_y = 1;
     up_z = 0;
@@ -395,35 +395,55 @@ void AlteraTamanhoJanela(GLsizei w, GLsizei h)
 }
 
 
-void MoverParaFrente(GLfloat dir)
-{
-    GLfloat vx = center_x - eye_x;
-    GLfloat vy = center_y - eye_y;
-    GLfloat vz = center_z - eye_z;
-
+void MoverParaFrente(GLfloat dir) {
+    // Calcular vetor direção da câmera para a origem
+    GLfloat vx = -eye_x;
+    GLfloat vy = -eye_y;
+    GLfloat vz = -eye_z;
+    
+    // Normalizar o vetor
     GLfloat len = sqrt(vx*vx + vy*vy + vz*vz);
-
-    vx /= len; vy /= len; vz /= len;
-
-    eye_x += vx * step * dir;
-    eye_y += vy * step * dir;
-    eye_z += vz * step * dir;
-    center_x += vx * step * dir;
-    center_y += vy * step * dir;
-    center_z += vz * step * dir;
+    if (len < 0.001f) return; // Evitar divisão por zero
+    
+    vx /= len; 
+    vy /= len; 
+    vz /= len;
+    
+    // Calcular nova distância
+    GLfloat newDist = len - dir * step;
+    
+    // Limitar distância mínima e máxima
+    if (newDist < 5.0f) newDist = 5.0f;
+    if (newDist > 500.0f) newDist = 500.0f;
+    
+    // Atualizar posição da câmera
+    eye_x = -vx * newDist;
+    eye_y = -vy * newDist;
+    eye_z = -vz * newDist;
 }
 
 
-void Rotacionar(GLfloat alfa)
-{ 
-    GLfloat vx = center_x - eye_x;
-    GLfloat vz = center_z - eye_z;
-
-    GLfloat nx = vx * cos(alfa) + vz * sin(alfa);
-    GLfloat nz = -vx * sin(alfa) + vz * cos(alfa);
-
-    center_x = eye_x + nx;
-    center_z = eye_z + nz;
+void Rotacionar(GLfloat alfa) { 
+    // Calcular vetor da câmera para a origem
+    GLfloat dx = -eye_x;
+    GLfloat dy = -eye_y;
+    GLfloat dz = -eye_z;
+    
+    // Rotacionar o vetor no plano XZ (em torno do eixo Y)
+    GLfloat cosA = cos(alfa);
+    GLfloat sinA = sin(alfa);
+    
+    GLfloat newDx = dx * cosA + dz * sinA;
+    GLfloat newDz = -dx * sinA + dz * cosA;
+    
+    // Atualizar posição da câmera
+    eye_x = -newDx;
+    eye_z = -newDz;
+    
+    // Manter o centro fixo na origem
+    center_x = 0.0f;
+    center_y = 0.0f;
+    center_z = 0.0f;
 }
 
 
@@ -444,11 +464,11 @@ void Teclado (unsigned char key, int x, int y)
             break;
         
         case 'a':
-            Rotacionar(+angle);
+            Rotacionar(-angle);
             break;
 
         case 'd':
-            Rotacionar(-angle);
+            Rotacionar(+angle);
             break;
 
         case 't':
@@ -525,7 +545,7 @@ void Teclado (unsigned char key, int x, int y)
             eye_y = 10;
             eye_z = 0;
             //center_x = -1000000000; center_y = center_z = 0;
-            center_x = center_y = center_z = 10;
+            center_x = center_y = center_z = 0;
             up_x = 0;
             up_y = 1;
             up_z = 0;
