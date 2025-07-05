@@ -26,6 +26,9 @@ const GLfloat step = 1.5f;
 const GLfloat angle = 5.0f * M_PI / 180.0f;
 const GLfloat scale = 100.0f;
 
+GLdouble modelview[16];
+GLdouble projection[16];
+GLint viewport[4];
 
 // Variáveis globais
 GLboolean simulationActive = GL_FALSE;
@@ -99,15 +102,17 @@ void calculateDrainagePath(int startVertex) {
 void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
     float minDist = FLT_MAX;
     int closestIndex = -1;
+    float threshold = 2.0f; // Distância máxima em unidades do modelo
 
     for (int i = 0; i < meuModelo.vertexCount; i++) {
         Vertex v = meuModelo.vertices[i];
         float dx = v.x - x;
         float dy = v.y - y;
         float dz = v.z - z;
-        float dist = dx*dx + dy*dy + dz*dz;
+        float dist = sqrt(dx*dx + dy*dy + dz*dz);
         
-        if (dist < minDist) {
+        // Considerar apenas vértices próximos
+        if (dist < minDist && dist < threshold) {
             minDist = dist;
             closestIndex = i;
         }
@@ -115,31 +120,52 @@ void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
 
     if (closestIndex != -1) {
         selectedVertexIndex = closestIndex;
+        selectedVertexX = meuModelo.vertices[closestIndex].x;
+        selectedVertexY = meuModelo.vertices[closestIndex].y;
+        selectedVertexZ = meuModelo.vertices[closestIndex].z;
+        
+        printf("Vértice selecionado: %d (%.2f, %.2f, %.2f)\n", 
+               closestIndex, selectedVertexX, selectedVertexY, selectedVertexZ);
+        
+        // Iniciar simulação
         calculateDrainagePath(closestIndex);
+    } else {
+        printf("Nenhum vértice próximo encontrado!\n");
     }
 }
 
 // Função de clique do mouse
 void Mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
+        // Obter matrizes atualizadas
         glGetIntegerv(GL_VIEWPORT, viewport);
+        glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+        glGetDoublev(GL_PROJECTION_MATRIX, projection);
         
         GLfloat winX = (GLfloat)x;
         GLfloat winY = (GLfloat)viewport[3] - (GLfloat)y - 1;
         GLfloat winZ;
         
+        // Ler profundidade do pixel clicado
         glReadPixels(x, (int)winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+        
+        // Verificar se a profundidade é válida (não fundo)
+        if (winZ >= 0.99f) {
+            printf("Clicou no fundo, ignorando...\n");
+            return;
+        }
         
         GLdouble posX, posY, posZ;
         gluUnProject(winX, winY, winZ,
                      modelview, projection, viewport,
                      &posX, &posY, &posZ);
         
-        // Ajuste para coordenadas do modelo
+        // Ajustar para coordenadas do modelo
         posX /= scale;
         posY /= scale;
         posZ /= scale;
         
+        printf("Clique convertido: X=%.2f, Y=%.2f, Z=%.2f\n", posX, posY, posZ);
         findClosestVertex((GLfloat)posX, (GLfloat)posY, (GLfloat)posZ);
         glutPostRedisplay();
     }
@@ -178,6 +204,17 @@ void Desenha(void)
         glTranslatef(v.x * scale, v.y * scale + 0.5f, v.z * scale);
         glColor3f(1.0f, 0.0f, 0.0f);
         glutSolidSphere(1.5f, 20, 20);
+        glPopMatrix();
+    }
+
+    // Desenhar bola no vértice selecionado (mesmo sem simulação)
+    if (selectedVertexIndex != -1) {
+        glPushMatrix();
+        glTranslatef(selectedVertexX * scale, 
+                     selectedVertexY * scale + 0.5f, 
+                     selectedVertexZ * scale);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glutSolidSphere(2.0f, 20, 20);
         glPopMatrix();
     }
 
@@ -231,7 +268,13 @@ void Inicializa (void)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
-    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+   glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+
+    // Salvar matrizes iniciais
+    //glMatrixMode(GL_PROJECTION);
+    //glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    //glMatrixMode(GL_MODELVIEW);
+    //glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
     eye_x = 200;
     eye_y = 10;
@@ -263,6 +306,9 @@ void EspecificaParametrosVisualizacao(void)
 
     gluLookAt(eye_x,eye_y,eye_z, center_x,center_y,center_z, up_x,up_y, up_z);
 
+      // Atualizar matrizes após mudança de visualização
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
     puts("");
     puts("DIGITE A TECLA 'w' PARA MOVER PARA FRENTE");
     puts("DIGITE A TECLA 's' PARA MOVER PARA TRÁS");
