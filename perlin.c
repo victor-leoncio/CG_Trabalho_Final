@@ -225,7 +225,16 @@ void generatePerlinTerrain(ObjModel *model, TerrainParams params) {
         model->materials[0].d = 1.0f;
         model->materials[0].illum = 2;
     }
+
     
+    for (int i = 0; i < totalVertices; i++) {
+        model->vertices[i].r = 1.0f;
+        model->vertices[i].g = 1.0f;
+        model->vertices[i].b = 1.0f;
+    } 
+
+    calculateTerrainColors(model);
+
     // Generate bounding box
     geraBox(model);
     buildAdjacency(model);
@@ -392,7 +401,15 @@ void generateMountainousTerrain(ObjModel *model, TerrainParams params) {
         model->materials[0].d = 1.0f;
         model->materials[0].illum = 2;
     }
-    
+
+    for (int i = 0; i < totalVertices; i++) {
+        model->vertices[i].r = 1.0f;
+        model->vertices[i].g = 1.0f;
+        model->vertices[i].b = 1.0f;
+    }
+
+    calculateTerrainColors(model); 
+
     // Generate bounding box
     geraBox(model);
     buildAdjacency(model); 

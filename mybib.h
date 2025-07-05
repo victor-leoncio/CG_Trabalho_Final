@@ -18,6 +18,7 @@ typedef struct FileList {
 // Estruturas para armazenar dados do OBJ
 typedef struct Vertex {
     float x, y, z;
+    GLfloat r, g, b;
 } Vertex;
 
 typedef struct TexCoord {
@@ -113,6 +114,7 @@ typedef struct {
 } Node;
 
 void buildAdjacency(ObjModel* model);
+void calculateTerrainColors(ObjModel *model);
 void crossProduct(Vertex v1, Vertex v2, Vertex *result);
 void normalize(Vertex *v);
 Vertex barycentricCoord(Vertex v1, Vertex v2, Vertex v3);

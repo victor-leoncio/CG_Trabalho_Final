@@ -641,6 +641,14 @@ int loadOBJ(const char *fileOBJ, const char *fileMTL, ObjModel *model) {
         }
     }
 
+    for (int i = 0; i < model->vertexCount; i++) {
+        model->vertices[i].r = 1.0f;
+        model->vertices[i].g = 1.0f;
+        model->vertices[i].b = 1.0f;
+    }
+
+    calculateTerrainColors(model);
+
     geraBox(model);
 
     fclose(file);
@@ -733,71 +741,106 @@ void drawNormals(ObjModel *model) {   // Vertex *normal, *v1, *v2, *v3) {
 
 // Função para desenhar o modelo
 void drawModel(ObjModel *model) {
-
-    if (!model->vertices || !model->texCoords || !model->faces) {
+    if (!model->vertices || !model->faces) {
         printf("Dados do modelo estão incompletos.\n");
         return;
     }
 
-    glBegin(GL_TRIANGLES);
-
     for (int i = 0; i < model->faceCount; i++) {
         Face face = model->faces[i];
 
-        if (face.v1 > model->vertexCount || face.t1 > model->texCoordCount) {
-            printf("Índice de face fora do intervalo.\n");
-            exit(EXIT_FAILURE);
+        // Verificar índices
+        if (face.v1 > model->vertexCount || face.v2 > model->vertexCount || face.v3 > model->vertexCount) {
+            printf("Índice de vértice fora do intervalo na face %d\n", i);
+            continue;
         }
 
-        // Ativar textura, se existir, e configurar o material
+        // Configurar material e textura
         for (int m = 0; m < model->materialCount; m++) {
-            if (strcmp(face.material,model->materials[m].name)) {
-                if (model->textures) {
-                    //glBindTexture(GL_TEXTURE_2D, proceduralTexture); // Substituir conforme necessário
-                    glBindTexture(GL_TEXTURE_2D, model->materials[m].textureID);
-                } 
+            if (strcmp(face.material, model->materials[m].name) == 0) {
+                // Aplicar propriedades do material
                 setMaterial(model->materials[m].Ka,
-                                model->materials[m].Kd,
-                                model->materials[m].Ks,
-                                model->materials[m].Ke,
-                                model->materials[m].Ns,
-                                model->materials[m].d,
-                                model->materials[m].illum);
+                            model->materials[m].Kd,
+                            model->materials[m].Ks,
+                            model->materials[m].Ke,
+                            model->materials[m].Ns,
+                            model->materials[m].d,
+                            model->materials[m].illum);
+                
+                // Aplicar textura se existir
+                if (model->textures) {
+                    glBindTexture(GL_TEXTURE_2D, model->materials[m].textureID);
+                    glEnable(GL_TEXTURE_2D);
+                }
                 break;
             }
         }
 
-        if (face.n1 > 0) {  //tem normais
-            glNormal3f(model->normals[face.n1 - 1].x, model->normals[face.n2 - 1].y, model->normals[face.n3 - 1].z);
-        } else {  //calcula as normais, considerando os vetores da face:
-            // Calcular os vetores da face
-            Vertex edge1 = {model->vertices[face.v2 - 1].x  -  model->vertices[face.v1 - 1].x, 
-                            model->vertices[face.v2 - 1].y  -  model->vertices[face.v1 - 1].y,
-                            model->vertices[face.v2 - 1].z  -  model->vertices[face.v1 - 1].z};
-            Vertex edge2 = {model->vertices[face.v3 - 1].x  -  model->vertices[face.v1 - 1].x, 
-                            model->vertices[face.v3 - 1].y  -  model->vertices[face.v1 - 1].y,
-                            model->vertices[face.v3 - 1].z  -  model->vertices[face.v1 - 1].z};
+        // Calcular/obter normais
+        if (face.n1 > 0 && face.n1 <= model->normalCount &&
+            face.n2 > 0 && face.n2 <= model->normalCount &&
+            face.n3 > 0 && face.n3 <= model->normalCount) {
+            // Usar normais do modelo
+            glBegin(GL_TRIANGLES);
+                glNormal3f(model->normals[face.n1 - 1].x, model->normals[face.n1 - 1].y, model->normals[face.n1 - 1].z);
+                glColor3f(model->vertices[face.v1 - 1].r, model->vertices[face.v1 - 1].g, model->vertices[face.v1 - 1].b);
+                if (model->texCoords && face.t1 > 0 && face.t1 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t1 - 1].u, model->texCoords[face.t1 - 1].v);
+                glVertex3f(model->vertices[face.v1 - 1].x, model->vertices[face.v1 - 1].y, model->vertices[face.v1 - 1].z);
 
-            // Calcular a normal
+                glNormal3f(model->normals[face.n2 - 1].x, model->normals[face.n2 - 1].y, model->normals[face.n2 - 1].z);
+                glColor3f(model->vertices[face.v2 - 1].r, model->vertices[face.v2 - 1].g, model->vertices[face.v2 - 1].b);
+                if (model->texCoords && face.t2 > 0 && face.t2 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t2 - 1].u, model->texCoords[face.t2 - 1].v);
+                glVertex3f(model->vertices[face.v2 - 1].x, model->vertices[face.v2 - 1].y, model->vertices[face.v2 - 1].z);
+
+                glNormal3f(model->normals[face.n3 - 1].x, model->normals[face.n3 - 1].y, model->normals[face.n3 - 1].z);
+                glColor3f(model->vertices[face.v3 - 1].r, model->vertices[face.v3 - 1].g, model->vertices[face.v3 - 1].b);
+                if (model->texCoords && face.t3 > 0 && face.t3 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t3 - 1].u, model->texCoords[face.t3 - 1].v);
+                glVertex3f(model->vertices[face.v3 - 1].x, model->vertices[face.v3 - 1].y, model->vertices[face.v3 - 1].z);
+            glEnd();
+        } else {
+            // Calcular normal da face
+            Vertex edge1 = {
+                model->vertices[face.v2 - 1].x - model->vertices[face.v1 - 1].x,
+                model->vertices[face.v2 - 1].y - model->vertices[face.v1 - 1].y,
+                model->vertices[face.v2 - 1].z - model->vertices[face.v1 - 1].z
+            };
+            Vertex edge2 = {
+                model->vertices[face.v3 - 1].x - model->vertices[face.v1 - 1].x,
+                model->vertices[face.v3 - 1].y - model->vertices[face.v1 - 1].y,
+                model->vertices[face.v3 - 1].z - model->vertices[face.v1 - 1].z
+            };
+            
             Vertex normal;
             crossProduct(edge1, edge2, &normal);
-
-            // Normalizar a normal
             normalize(&normal);
-
-            glNormal3f(normal.x, normal.y, normal.z);
+            
+            glBegin(GL_TRIANGLES);
+                glNormal3f(normal.x, normal.y, normal.z);
+                
+                glColor3f(model->vertices[face.v1 - 1].r, model->vertices[face.v1 - 1].g, model->vertices[face.v1 - 1].b);
+                if (model->texCoords && face.t1 > 0 && face.t1 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t1 - 1].u, model->texCoords[face.t1 - 1].v);
+                glVertex3f(model->vertices[face.v1 - 1].x, model->vertices[face.v1 - 1].y, model->vertices[face.v1 - 1].z);
+                
+                glColor3f(model->vertices[face.v2 - 1].r, model->vertices[face.v2 - 1].g, model->vertices[face.v2 - 1].b);
+                if (model->texCoords && face.t2 > 0 && face.t2 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t2 - 1].u, model->texCoords[face.t2 - 1].v);
+                glVertex3f(model->vertices[face.v2 - 1].x, model->vertices[face.v2 - 1].y, model->vertices[face.v2 - 1].z);
+                
+                glColor3f(model->vertices[face.v3 - 1].r, model->vertices[face.v3 - 1].g, model->vertices[face.v3 - 1].b);
+                if (model->texCoords && face.t3 > 0 && face.t3 <= model->texCoordCount)
+                    glTexCoord2f(model->texCoords[face.t3 - 1].u, model->texCoords[face.t3 - 1].v);
+                glVertex3f(model->vertices[face.v3 - 1].x, model->vertices[face.v3 - 1].y, model->vertices[face.v3 - 1].z);
+            glEnd();
         }
-
-
-        if (model->textures) glTexCoord2f(model->texCoords[face.t1 - 1].u, model->texCoords[face.t1 - 1].v);
-        glVertex3f(model->vertices[face.v1 - 1].x, model->vertices[face.v1 - 1].y, model->vertices[face.v1 - 1].z);
-        if (model->textures) glTexCoord2f(model->texCoords[face.t2 - 1].u, model->texCoords[face.t2 - 1].v);
-        glVertex3f(model->vertices[face.v2 - 1].x, model->vertices[face.v2 - 1].y, model->vertices[face.v2 - 1].z);
-        if (model->textures) glTexCoord2f(model->texCoords[face.t3 - 1].u, model->texCoords[face.t3 - 1].v);
-        glVertex3f(model->vertices[face.v3 - 1].x, model->vertices[face.v3 - 1].y, model->vertices[face.v3 - 1].z);
+        
+        if (model->textures) {
+            glDisable(GL_TEXTURE_2D);
+        }
     }
-    glEnd();  //GL_TRIANGLES
-
 }
 
 void drawBox(Box b) {
@@ -954,4 +997,48 @@ void buildAdjacency(ObjModel* model) {
     free(tempNeighbors);
     free(counts);
     free(capacities);
+}
+
+void calculateTerrainColors(ObjModel *model) {
+    if (model->vertexCount == 0) return;
+    
+    // Encontra alturas mínima e máxima
+    float minY = model->vertices[0].y;
+    float maxY = model->vertices[0].y;
+    
+    for (int i = 1; i < model->vertexCount; i++) {
+        if (model->vertices[i].y < minY) minY = model->vertices[i].y;
+        if (model->vertices[i].y > maxY) maxY = model->vertices[i].y;
+    }
+    
+    float range = maxY - minY;
+    if (range < 0.001f) range = 1.0f; // Evita divisão por zero
+    
+    // Define zonas de cores
+    float valleyHeight = minY + 0.2f * range;    // 20% mais alto que o mínimo
+    float mountainHeight = minY + 0.7f * range;  // 70% mais alto que o mínimo
+    
+    for (int i = 0; i < model->vertexCount; i++) {
+        float height = model->vertices[i].y;
+        float normalized = (height - minY) / range;
+        
+        if (height < valleyHeight) {
+            // Vale: marrom (RGB: 139/69/19)
+            model->vertices[i].r = 139.0f/255.0f;
+            model->vertices[i].g = 69.0f/255.0f;
+            model->vertices[i].b = 19.0f/255.0f;
+        } 
+        else if (height < mountainHeight) {
+            // Encosta: verde (RGB: 34/139/34)
+            model->vertices[i].r = 34.0f/255.0f;
+            model->vertices[i].g = 139.0f/255.0f;
+            model->vertices[i].b = 34.0f/255.0f;
+        } 
+        else {
+            // Pico: branco (RGB: 1,1,1)
+            model->vertices[i].r = 1.0f;
+            model->vertices[i].g = 1.0f;
+            model->vertices[i].b = 1.0f;
+        }
+    }
 }

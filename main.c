@@ -191,14 +191,51 @@ void Mouse(int button, int state, int x, int y) {
     }
 }
 
+void DesenhaCeu() {
+    glDisable(GL_LIGHTING);  // Desativa iluminação para o céu
+    glDisable(GL_DEPTH_TEST); // Desativa teste de profundidade
+    
+    glMatrixMode(GL_PROJECTION);
+    glPushMatrix();
+    glLoadIdentity();
+    gluOrtho2D(0, 1, 0, 1); // Espaço de coordenadas normalizado
+    
+    glMatrixMode(GL_MODELVIEW);
+    glPushMatrix();
+    glLoadIdentity();
+    
+    // Desenha gradiente de céu (azul claro para azul escuro)
+    glBegin(GL_QUADS);
+        // Topo - azul claro
+        glColor3f(0.53f, 0.81f, 0.92f); // Azul céu
+        glVertex2f(0, 1);
+        glVertex2f(1, 1);
+        
+        // Base - azul mais escuro
+        glColor3f(0.0f, 0.35f, 0.5f);   // Azul marinho
+        glVertex2f(1, 0);
+        glVertex2f(0, 0);
+    glEnd();
+    
+    glPopMatrix();
+    glMatrixMode(GL_PROJECTION);
+    glPopMatrix();
+    glMatrixMode(GL_MODELVIEW);
+    
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_LIGHTING);
+}
 
 void Desenha(void)
 {	
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+     // Desenha o céu primeiro (como fundo)
+    DesenhaCeu(); 
+
     glPushMatrix();
     glTranslatef(0.0f,0.0f,0.0f);
-	glColor3f(1.0f, 1.0f, 1.0f);
+	//glColor3f(1.0f, 1.0f, 1.0f);
     glScalef(scale, scale, scale);
 	drawModel(&meuModelo);
     glPopMatrix();
@@ -253,8 +290,10 @@ void Inicializa (void)
 	GLfloat especularidade[4]={1.0,1.0,1.0,1.0}; 
 	GLint especMaterial = 60;
 
-    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glShadeModel(GL_SMOOTH);
+    //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    // Mudar para azul mais escuro (para combinar com o gradiente)
+    glClearColor(0.0f, 0.35f, 0.5f, 1.0f); // Azul marinho 
+    glShadeModel(GL_SMOOTH);
 	glMaterialfv(GL_FRONT,GL_SPECULAR, especularidade);
 	glMateriali(GL_FRONT,GL_SHININESS,especMaterial);
 
@@ -265,6 +304,8 @@ void Inicializa (void)
 	glLightfv(GL_LIGHT0, GL_POSITION, posicaoLuz );
 
 	glEnable(GL_COLOR_MATERIAL);
+    glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
+
 	glEnable(GL_LIGHTING);  
 	glEnable(GL_LIGHT0);    
 	glEnable(GL_DEPTH_TEST);
@@ -317,7 +358,7 @@ void EspecificaParametrosVisualizacao(void)
         GLfloat s = 100;
         glOrtho(-s*fAspect, s*fAspect, -s, s, 1, 500);
     } else { 
-        gluPerspective(60,fAspect,0.5,500);
+        gluPerspective(60,fAspect,0.5,1000);
     }
 
 	glMatrixMode(GL_MODELVIEW);
