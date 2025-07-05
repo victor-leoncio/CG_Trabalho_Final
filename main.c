@@ -99,10 +99,9 @@ void calculateDrainagePath(int startVertex) {
     }
 }
 // Função para encontrar o vértice mais próximo
-void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
+void findNearestVertexInRadius(GLfloat x, GLfloat y, GLfloat z, float radius) {
     float minDist = FLT_MAX;
     int closestIndex = -1;
-    float threshold = 2.0f; // Distância máxima em unidades do modelo
 
     for (int i = 0; i < meuModelo.vertexCount; i++) {
         Vertex v = meuModelo.vertices[i];
@@ -111,8 +110,8 @@ void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
         float dz = v.z - z;
         float dist = sqrt(dx*dx + dy*dy + dz*dz);
         
-        // Considerar apenas vértices próximos
-        if (dist < minDist && dist < threshold) {
+        // Considerar apenas vértices dentro do raio
+        if (dist < radius && dist < minDist) {
             minDist = dist;
             closestIndex = i;
         }
@@ -130,8 +129,22 @@ void findClosestVertex(GLfloat x, GLfloat y, GLfloat z) {
         // Iniciar simulação
         calculateDrainagePath(closestIndex);
     } else {
-        printf("Nenhum vértice próximo encontrado!\n");
+        printf("Nenhum vértice encontrado dentro do raio de %.2f unidades\n", radius);
     }
+}
+
+float calculateSelectionRadius() {
+    // Distância aproximada da câmera ao centro da cena
+    float camDistance = sqrt(eye_x*eye_x + eye_y*eye_y + eye_z*eye_z);
+    
+    // Raio base: maior quando a câmera está mais longe
+    float baseRadius = camDistance * 0.02f;
+    
+    // Limitar o raio mínimo e máximo
+    if (baseRadius < 0.5f) baseRadius = 0.5f;
+    if (baseRadius > 5.0f) baseRadius = 5.0f;
+    
+    return baseRadius;
 }
 
 // Função de clique do mouse
@@ -150,8 +163,8 @@ void Mouse(int button, int state, int x, int y) {
         glReadPixels(x, (int)winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
         
         // Verificar se a profundidade é válida (não fundo)
-        if (winZ >= 0.99f) {
-            printf("Clicou no fundo, ignorando...\n");
+        if (winZ > 0.999f) {
+            printf("Clicou no fundo (winZ = %.6f), ignorando...\n", winZ);
             return;
         }
         
@@ -166,7 +179,14 @@ void Mouse(int button, int state, int x, int y) {
         posZ /= scale;
         
         printf("Clique convertido: X=%.2f, Y=%.2f, Z=%.2f\n", posX, posY, posZ);
-        findClosestVertex((GLfloat)posX, (GLfloat)posY, (GLfloat)posZ);
+        
+        // Calcular raio de seleção adaptativo
+        float selectionRadius = calculateSelectionRadius();
+        printf("Raio de seleção: %.2f unidades\n", selectionRadius);
+        
+        // Encontrar vértice mais próximo dentro do raio
+        findNearestVertexInRadius((GLfloat)posX, (GLfloat)posY, (GLfloat)posZ, selectionRadius);
+        
         glutPostRedisplay();
     }
 }
@@ -268,7 +288,7 @@ void Inicializa (void)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
-   glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
     // Salvar matrizes iniciais
     //glMatrixMode(GL_PROJECTION);
