@@ -163,7 +163,7 @@ void Mouse(int button, int state, int x, int y) {
         glReadPixels(x, (int)winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
         
         // Verificar se a profundidade é válida (não fundo)
-        if (winZ > 0.999f) {
+        if (winZ > 4.0f) {
             printf("Clicou no fundo (winZ = %.6f), ignorando...\n", winZ);
             return;
         }
@@ -299,8 +299,8 @@ void Inicializa (void)
     eye_x = 200;
     eye_y = 10;
     eye_z = 0;
-    center_x = -1000000000;
-    center_y = center_z = 0;
+    //center_x = -1000000000;
+    center_x = center_y = center_z = 1;
     up_x = 0;
     up_y = 1;
     up_z = 0;
@@ -483,7 +483,8 @@ void Teclado (unsigned char key, int x, int y)
             eye_x = 200;
             eye_y = 10;
             eye_z = 0;
-            center_x = -1000000000; center_y = center_z = 0;
+            //center_x = -1000000000; center_y = center_z = 0;
+            center_x = center_y = center_z = 10;
             up_x = 0;
             up_y = 1;
             up_z = 0;
