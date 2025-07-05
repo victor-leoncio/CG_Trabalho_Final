@@ -201,6 +201,14 @@ void freeObjModel(ObjModel *obj) {
         free(obj->adjacency);
         obj->adjacency = NULL;
     }
+
+        // Resetar contagens
+    obj->vertexCount = 0;
+    obj->texCoordCount = 0;
+    obj->faceCount = 0;
+    obj->normalCount = 0;
+    obj->materialCount = 0;
+    obj->textureCount = 0;
 }
 
 void geraBox(ObjModel *model) {
@@ -863,7 +871,7 @@ void AtualizaRotacao(GLfloat *mat, float angle, float x, float y, float z) {
 
 
 void buildAdjacency(ObjModel* model) {
-    // Libera adjacências anteriores se existirem
+     // Liberar adjacência existente
     if (model->adjacency != NULL) {
         for (int i = 0; i < model->vertexCount; i++) {
             if (model->adjacency[i].neighbors != NULL) {
@@ -871,6 +879,13 @@ void buildAdjacency(ObjModel* model) {
             }
         }
         free(model->adjacency);
+        model->adjacency = NULL;
+    }
+    
+    // Verificar se temos dados suficientes
+    if (model->vertexCount == 0 || model->faceCount == 0) {
+        printf("Aviso: Nada para construir em buildAdjacency\n");
+        return;
     }
 
     // Aloca memória para a estrutura de adjacência

@@ -424,35 +424,57 @@ void Teclado (unsigned char key, int x, int y)
 
         case 'n':
             usePerlinTerrain = !usePerlinTerrain;
+            
+            // Liberar recursos de simulação atuais
+            if (drainagePath != NULL) {
+                free(drainagePath);
+                drainagePath = NULL;
+            }
+            simulationActive = GL_FALSE;
+            selectedVertexIndex = -1;
+            
             if (usePerlinTerrain) {
-                // Generate mountainous terrain with dramatic peaks and valleys
+                // Generate mountainous terrain
                 TerrainParams params;
-                params.width = 100;          // Good balance of detail and performance
-                params.height = 100;         // Good balance of detail and performance
-                params.scale = 0.1f;        // Not used in mountainous terrain but kept for compatibility
-                params.octaves = 6;         // Not used in mountainous terrain but kept for compatibility
-                params.persistence = 0.7f;  // Not used in mountainous terrain but kept for compatibility
-                params.lacunarity = 2.5f;   // Not used in mountainous terrain but kept for compatibility
+                params.width = 100;
+                params.height = 100;
+                params.scale = 0.1f;
+                params.octaves = 6;
+                params.persistence = 0.7f;
+                params.lacunarity = 2.5f;
                 
                 generateMountainousTerrain(&meuModelo, params);
-                printf("Terreno montanhoso ativado (picos dramáticos)\n");
+                printf("Terreno montanhoso ativado\n");
             } else {
-                // Reload OBJ terrain
+                // Carregar terreno OBJ
                 freeObjModel(&meuModelo);
+                
+                // Inicializar explicitamente
+                meuModelo.vertices = NULL;
+                meuModelo.texCoords = NULL;
+                meuModelo.faces = NULL;
+                meuModelo.normals = NULL;
+                meuModelo.materials = NULL;
+                meuModelo.textures = NULL;
+                meuModelo.adjacency = NULL;
+                
                 if (loadOBJ("scene.obj", "scene.mtl", &meuModelo) == 0) {
                     fprintf(stderr, "Erro ao recarregar modelo OBJ/MTL\n");
-                    // If OBJ fails, fallback to mountainous terrain
-                    TerrainParams params;
-                    params.width = 60;
-                    params.height = 60;
-                    params.scale = 0.1f;
-                    params.octaves = 6;
-                    params.persistence = 0.7f;
-                    params.lacunarity = 2.5f;
-                    generateMountainousTerrain(&meuModelo, params);
+                    
+                    // Fallback para terreno Perlin
+                    TerrainParams params_fallback;
+                    params_fallback.width = 60;
+                    params_fallback.height = 60;
+                    params_fallback.scale = 0.1f;
+                    params_fallback.octaves = 6;
+                    params_fallback.persistence = 0.7f;
+                    params_fallback.lacunarity = 2.5f;
+                    
+                    generateMountainousTerrain(&meuModelo, params_fallback);
                     usePerlinTerrain = GL_TRUE;
                 } else {
                     printf("Terreno OBJ ativado\n");
+                    buildAdjacency(&meuModelo);
                 }
             }
             break;
@@ -507,4 +529,10 @@ int main(int argc, char **argv)
 	Inicializa();
 	glutMainLoop();
     freeObjModel(&meuModelo);
+
+    if (drainagePath != NULL) {
+        free(drainagePath);
+    }
+
+    return 0;
 }
