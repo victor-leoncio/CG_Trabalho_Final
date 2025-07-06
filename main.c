@@ -15,6 +15,15 @@ ObjModel meuModelo;
 GLboolean ortho = GL_FALSE;
 GLboolean usePerlinTerrain = GL_FALSE;
 
+// Novas variáveis para câmeras adicionais
+GLfloat eye_x_ball, eye_y_ball, eye_z_ball;
+GLfloat center_x_ball, center_y_ball, center_z_ball;
+GLfloat up_x_ball, up_y_ball, up_z_ball;
+
+GLfloat eye_x_wireframe, eye_y_wireframe, eye_z_wireframe;
+GLfloat center_x_wireframe, center_y_wireframe, center_z_wireframe;
+GLfloat up_x_wireframe, up_y_wireframe, up_z_wireframe;
+
 // Vertex selection variables
 GLboolean selectVertexMode = GL_FALSE;
 int selectedVertexIndex = -1;
@@ -38,11 +47,6 @@ int currentStep = 0;
 GLboolean showPath = GL_TRUE;
 GLboolean continuousAnimation = GL_TRUE;
 int animationSpeed = 100; // ms
-
-// Matrizes para unproject
-GLdouble modelview[16];
-GLdouble projection[16];
-GLint viewport[4];
 
 
 // Função timer
@@ -152,43 +156,50 @@ void Mouse(int button, int state, int x, int y) {
         int winWidth = glutGet(GLUT_WINDOW_WIDTH);
         int winHeight = glutGet(GLUT_WINDOW_HEIGHT);
         int mainWidth = winWidth * 0.8;
+        int sideWidth = winWidth - mainWidth;
+        int halfHeight = winHeight / 2;
         
         // Verificar se clique está dentro da viewport principal
-        if (x < 0 || x > mainWidth || y < 0 || y > winHeight) {
-            printf("Clique fora da viewport principal\n");
-            return;
+        if (x >= 0 && x <= mainWidth && y >= 0 && y <= winHeight) {
+            // Converter Y para coordenadas OpenGL (origem no canto inferior)
+            int glY = winHeight - y;
+            
+            GLfloat winZ;
+            glReadPixels(x, glY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
+            
+            // Verificar se o clique foi no fundo
+            if (winZ < 1.0f - FLT_EPSILON) {
+                GLdouble worldX, worldY, worldZ;
+                gluUnProject(x, glY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
+                
+                // Converter para coordenadas do modelo
+                worldX /= scale;
+                worldY /= scale;
+                worldZ /= scale;
+                
+                // Calcular raio de seleção adaptativo
+                float radius = calculateSelectionRadius();
+                findNearestVertexInRadius(worldX, worldY, worldZ, radius);
+                
+                // Iniciar simulação se vértice válido foi selecionado
+                if (selectedVertexIndex != -1) {
+                    calculateDrainagePath(selectedVertexIndex);
+                }
+                
+                glutPostRedisplay();
+            }
         }
-        
-        // Converter Y para coordenadas OpenGL (origem no canto inferior)
-        int glY = winHeight - y;
-        
-        GLfloat winZ;
-        glReadPixels(x, glY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
-        
-        // Verificar se o clique foi no fundo
-        if (winZ >= 1.0f - FLT_EPSILON) {
-            printf("Clique no fundo ignorado\n");
-            return;
+        // Verificar clique na viewport superior direita (acompanhamento da bola)
+        else if (x >= mainWidth && x < winWidth && y >= halfHeight && y < winHeight) {
+            printf("Clique na viewport de acompanhamento da bola\n");
         }
-        
-        GLdouble worldX, worldY, worldZ;
-        gluUnProject(x, glY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
-        
-        // Converter para coordenadas do modelo
-        worldX /= scale;
-        worldY /= scale;
-        worldZ /= scale;
-        
-        // Calcular raio de seleção adaptativo
-        float radius = calculateSelectionRadius();
-        findNearestVertexInRadius(worldX, worldY, worldZ, radius);
-        
-        // Iniciar simulação se vértice válido foi selecionado
-        if (selectedVertexIndex != -1) {
-            calculateDrainagePath(selectedVertexIndex);
+        // Verificar clique na viewport inferior direita (wireframe)
+        else if (x >= mainWidth && x < winWidth && y >= 0 && y < halfHeight) {
+            printf("Clique na viewport wireframe\n");
         }
-        
-        glutPostRedisplay();
+        else {
+            printf("Clique fora das viewports\n");
+        }
     }
 }
 
@@ -228,24 +239,128 @@ void DesenhaCeu() {
 }
 
 void Desenha(void)
-{	
+{
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-     // Atualizar matrizes antes de desenhar
+    // Viewport principal
+    glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
-    glGetDoublev(GL_MODELVIEW_MATRIX, modelview); 
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
-     // Desenha o céu primeiro (como fundo)
-    DesenhaCeu(); 
+    // Desenha o céu primeiro (como fundo)
+    DesenhaCeu();
 
     glPushMatrix();
     glTranslatef(0.0f,0.0f,0.0f);
-	//glColor3f(1.0f, 1.0f, 1.0f);
     glScalef(scale, scale, scale);
 	drawModel(&meuModelo);
     glPopMatrix();
+
+    // Renderizar elementos comuns na viewport principal
+    if (showPath && drainagePath != NULL && pathLength > 0) {
+        glDisable(GL_LIGHTING);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glLineWidth(2.0f);
+        glBegin(GL_LINE_STRIP);
+        for (int i = 0; i <= currentStep; i++) {
+            Vertex v = meuModelo.vertices[drainagePath[i]];
+            glVertex3f(v.x * scale, v.y * scale + 0.1f, v.z * scale);
+        }
+        glEnd();
+        glEnable(GL_LIGHTING);
+    }
+
+    // Desenha a bola na simulação
+    if (simulationActive && drainagePath != NULL && pathLength > 0) {
+        Vertex v = meuModelo.vertices[drainagePath[currentStep]];
+        glPushMatrix();
+        glTranslatef(v.x * scale, v.y * scale + 0.5f, v.z * scale);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glutSolidSphere(1.5f, 20, 20);
+        glPopMatrix();
+    }
+
+    // Desenhar bola no vértice selecionado (mesmo sem simulação)
+    if (selectedVertexIndex != -1) {
+        glPushMatrix();
+        glTranslatef(selectedVertexX * scale,
+                     selectedVertexY * scale + 0.5f,
+                     selectedVertexZ * scale);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glutSolidSphere(2.0f, 20, 20);
+        glPopMatrix();
+    }
+
+    // Viewport superior direita (acompanhando a bola)
+    int winWidth = glutGet(GLUT_WINDOW_WIDTH);
+    int winHeight = glutGet(GLUT_WINDOW_HEIGHT);
+    int mainWidth = winWidth * 0.8;
+    int sideWidth = winWidth - mainWidth;
+    int halfHeight = winHeight / 2;
+
+    glViewport(mainWidth, halfHeight, sideWidth, halfHeight);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    // Se houver uma bola em movimento, ajustar câmera para seguir
+    if (simulationActive && drainagePath != NULL && pathLength > 0) {
+        Vertex v = meuModelo.vertices[drainagePath[currentStep]];
+        
+        // Posicionar câmera em terceira pessoa, atrás e um pouco acima da bola
+        eye_x_ball = v.x * scale + 5.0f;  // Posição x atrás da bola
+        eye_y_ball = v.y * scale + 20.0f;  // Um pouco acima
+        eye_z_ball = v.z * scale;// - 30.0f;  // Recuado no eixo z
+        
+        gluLookAt(eye_x_ball, eye_y_ball, eye_z_ball,
+                  v.x * scale, v.y * scale, v.z * scale,
+                  0, 1, 0);  // Mantém orientação vertical
+    }
+
+    // Renderizar modelo e bola nesta viewport
+    glPushMatrix();
+    glScalef(scale, scale, scale);
+    drawModel(&meuModelo);
+    
+    // Desenhar bola na viewport de acompanhamento
+    if (simulationActive && drainagePath != NULL && pathLength > 0) {
+        Vertex v = meuModelo.vertices[drainagePath[currentStep]];
+        glPushMatrix();
+        glTranslatef(v.x, v.y, v.z);
+        glColor3f(1.0f, 0.0f, 0.0f);
+        glutSolidSphere(0.015f, 20, 20);  // Reduzir o tamanho da esfera
+        glPopMatrix();
+    }
+    glPopMatrix();
+
+    // Viewport inferior direita (wireframe)
+    glViewport(mainWidth, 0, sideWidth, halfHeight);
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+
+    // Vista lateral ortográfica em wireframe
+    eye_x_wireframe = 0;
+    eye_y_wireframe = 0;
+    eye_z_wireframe = 200;
+    
+    gluLookAt(eye_x_wireframe, eye_y_wireframe, eye_z_wireframe,
+              0, 0, 0,
+              0, 1, 0);
+
+    // Renderizar em wireframe
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glDisable(GL_LIGHTING);
+    glColor3f(1.0f, 1.0f, 1.0f);  // Cor branca para wireframe
+    
+    glPushMatrix();
+    glScalef(scale, scale, scale);
+    drawModel(&meuModelo);
+    glPopMatrix();
+    
+    // Restaurar modo de renderização sólida
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    glEnable(GL_LIGHTING);
 
     // Desenha o caminho de drenagem
     if (showPath && drainagePath != NULL && pathLength > 0) {
@@ -362,7 +477,7 @@ void EspecificaParametrosVisualizacao(void)
 
     if (ortho) {
         GLfloat s = 100;
-        glOrtho(-s*fAspect, s*fAspect, -s, s, 1, 500);
+        glOrtho(-s*fAspect, s*fAspect, -s, s, 1, 1000);
     } else { 
         gluPerspective(60,fAspect,0.5,1000);
     }
@@ -398,15 +513,26 @@ void AlteraTamanhoJanela(GLsizei w, GLsizei h) {
     
     // Configurar viewport principal (80% da largura)
     int mainWidth = w * 0.8;
+    int sideWidth = w - mainWidth;
+    int halfHeight = h / 2;
+    
+    // Viewport principal (esquerda)
     glViewport(0, 0, mainWidth, h);
     
-    // Atualizar variável global da viewport
+    // Atualizar variável global da viewport principal
     viewport[0] = 0;
     viewport[1] = 0;
     viewport[2] = mainWidth;
     viewport[3] = h;
     
     fAspect = (GLfloat)mainWidth / (GLfloat)h;
+    
+    // Viewport superior direita (acompanhando a bola)
+    glViewport(mainWidth, halfHeight, sideWidth, halfHeight);
+    
+    // Viewport inferior direita (wireframe)
+    glViewport(mainWidth, 0, sideWidth, halfHeight);
+    
     EspecificaParametrosVisualizacao();
 }
 
