@@ -100,20 +100,21 @@ void calculateDrainagePath(int startVertex) {
 }
 // Função para encontrar o vértice mais próximo
 void findNearestVertexInRadius(GLfloat x, GLfloat y, GLfloat z, float radius) {
-    float minDist = FLT_MAX;
+    float minDist = radius * radius; // Distância quadrada máxima
     int closestIndex = -1;
+    float actualDist = radius;
 
     for (int i = 0; i < meuModelo.vertexCount; i++) {
         Vertex v = meuModelo.vertices[i];
         float dx = v.x - x;
         float dy = v.y - y;
         float dz = v.z - z;
-        float dist = sqrt(dx*dx + dy*dy + dz*dz);
+        float distSq = dx*dx + dy*dy + dz*dz;
         
-        // Considerar apenas vértices dentro do raio
-        if (dist < radius && dist < minDist) {
-            minDist = dist;
+        if (distSq < minDist) {
+            minDist = distSq;
             closestIndex = i;
+            actualDist = sqrt(distSq);
         }
     }
 
@@ -123,26 +124,24 @@ void findNearestVertexInRadius(GLfloat x, GLfloat y, GLfloat z, float radius) {
         selectedVertexY = meuModelo.vertices[closestIndex].y;
         selectedVertexZ = meuModelo.vertices[closestIndex].z;
         
-        printf("Vértice selecionado: %d (%.2f, %.2f, %.2f)\n", 
-               closestIndex, selectedVertexX, selectedVertexY, selectedVertexZ);
-        
-        // Iniciar simulação
-        calculateDrainagePath(closestIndex);
+        printf("Vértice selecionado: %d (%.2f, %.2f, %.2f) - Distância: %.2f\n", 
+               closestIndex, selectedVertexX, selectedVertexY, selectedVertexZ, actualDist);
     } else {
         printf("Nenhum vértice encontrado dentro do raio de %.2f unidades\n", radius);
+        selectedVertexIndex = -1;
     }
 }
 
 float calculateSelectionRadius() {
-    // Distância aproximada da câmera ao centro da cena
+    // Distância da câmera ao ponto de interesse
     float camDistance = sqrt(eye_x*eye_x + eye_y*eye_y + eye_z*eye_z);
     
-    // Raio base: maior quando a câmera está mais longe
-    float baseRadius = camDistance * 0.02f;
+    // Raio baseado na distância (ajuste conforme necessário)
+    float baseRadius = camDistance * 0.01f;
     
-    // Limitar o raio mínimo e máximo
-    if (baseRadius < 0.5f) baseRadius = 0.5f;
-    if (baseRadius > 5.0f) baseRadius = 5.0f;
+    // Limites do raio
+    if (baseRadius < 0.1f) baseRadius = 0.1f;
+    if (baseRadius > 2.0f) baseRadius = 2.0f;
     
     return baseRadius;
 }
@@ -150,42 +149,44 @@ float calculateSelectionRadius() {
 // Função de clique do mouse
 void Mouse(int button, int state, int x, int y) {
     if (button == GLUT_LEFT_BUTTON && state == GLUT_DOWN) {
-        // Obter matrizes atualizadas
-        glGetIntegerv(GL_VIEWPORT, viewport);
-        glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
-        glGetDoublev(GL_PROJECTION_MATRIX, projection);
+        int winWidth = glutGet(GLUT_WINDOW_WIDTH);
+        int winHeight = glutGet(GLUT_WINDOW_HEIGHT);
+        int mainWidth = winWidth * 0.8;
         
-        GLfloat winX = (GLfloat)x;
-        GLfloat winY = (GLfloat)viewport[3] - (GLfloat)y - 1;
-        GLfloat winZ;
-        
-        // Ler profundidade do pixel clicado
-        glReadPixels(x, (int)winY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
-        
-        // Verificar se a profundidade é válida (não fundo)
-        if (winZ > 4.0f) {
-            printf("Clicou no fundo (winZ = %.6f), ignorando...\n", winZ);
+        // Verificar se clique está dentro da viewport principal
+        if (x < 0 || x > mainWidth || y < 0 || y > winHeight) {
+            printf("Clique fora da viewport principal\n");
             return;
         }
         
-        GLdouble posX, posY, posZ;
-        gluUnProject(winX, winY, winZ,
-                     modelview, projection, viewport,
-                     &posX, &posY, &posZ);
+        // Converter Y para coordenadas OpenGL (origem no canto inferior)
+        int glY = winHeight - y;
         
-        // Ajustar para coordenadas do modelo
-        posX /= scale;
-        posY /= scale;
-        posZ /= scale;
+        GLfloat winZ;
+        glReadPixels(x, glY, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &winZ);
         
-        printf("Clique convertido: X=%.2f, Y=%.2f, Z=%.2f\n", posX, posY, posZ);
+        // Verificar se o clique foi no fundo
+        if (winZ >= 1.0f - FLT_EPSILON) {
+            printf("Clique no fundo ignorado\n");
+            return;
+        }
+        
+        GLdouble worldX, worldY, worldZ;
+        gluUnProject(x, glY, winZ, modelview, projection, viewport, &worldX, &worldY, &worldZ);
+        
+        // Converter para coordenadas do modelo
+        worldX /= scale;
+        worldY /= scale;
+        worldZ /= scale;
         
         // Calcular raio de seleção adaptativo
-        float selectionRadius = calculateSelectionRadius();
-        printf("Raio de seleção: %.2f unidades\n", selectionRadius);
+        float radius = calculateSelectionRadius();
+        findNearestVertexInRadius(worldX, worldY, worldZ, radius);
         
-        // Encontrar vértice mais próximo dentro do raio
-        findNearestVertexInRadius((GLfloat)posX, (GLfloat)posY, (GLfloat)posZ, selectionRadius);
+        // Iniciar simulação se vértice válido foi selecionado
+        if (selectedVertexIndex != -1) {
+            calculateDrainagePath(selectedVertexIndex);
+        }
         
         glutPostRedisplay();
     }
@@ -229,6 +230,12 @@ void DesenhaCeu() {
 void Desenha(void)
 {	
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+     // Atualizar matrizes antes de desenhar
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
+    gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview); 
 
      // Desenha o céu primeiro (como fundo)
     DesenhaCeu(); 
@@ -351,8 +358,7 @@ void Inicializa (void)
 void EspecificaParametrosVisualizacao(void)
 {
 	glMatrixMode(GL_PROJECTION);
-
-	glLoadIdentity();
+    glLoadIdentity();
 
     if (ortho) {
         GLfloat s = 100;
@@ -360,12 +366,16 @@ void EspecificaParametrosVisualizacao(void)
     } else { 
         gluPerspective(60,fAspect,0.5,1000);
     }
+    
+    // Atualizar matriz de projeção
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
 
-	glMatrixMode(GL_MODELVIEW);
-
-	glLoadIdentity();
-
+    glMatrixMode(GL_MODELVIEW);
+    glLoadIdentity();
     gluLookAt(eye_x,eye_y,eye_z, center_x,center_y,center_z, up_x,up_y, up_z);
+    
+    // Atualizar matriz de modelview
+    glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
       // Atualizar matrizes após mudança de visualização
     glGetDoublev(GL_PROJECTION_MATRIX, projection);
@@ -383,15 +393,21 @@ void EspecificaParametrosVisualizacao(void)
 }
 
 
-void AlteraTamanhoJanela(GLsizei w, GLsizei h)
-{
-	if ( h == 0 ) h = 1;
-
-    glViewport(0, 0, w, h);
-
-	fAspect = (GLfloat)w/(GLfloat)h;
-
-	EspecificaParametrosVisualizacao();
+void AlteraTamanhoJanela(GLsizei w, GLsizei h) {
+    if (h == 0) h = 1;
+    
+    // Configurar viewport principal (80% da largura)
+    int mainWidth = w * 0.8;
+    glViewport(0, 0, mainWidth, h);
+    
+    // Atualizar variável global da viewport
+    viewport[0] = 0;
+    viewport[1] = 0;
+    viewport[2] = mainWidth;
+    viewport[3] = h;
+    
+    fAspect = (GLfloat)mainWidth / (GLfloat)h;
+    EspecificaParametrosVisualizacao();
 }
 
 
