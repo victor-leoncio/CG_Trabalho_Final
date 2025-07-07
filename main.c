@@ -698,7 +698,7 @@ void Teclado (unsigned char key, int x, int y)
                 meuModelo.textures = NULL;
                 meuModelo.adjacency = NULL;
                 
-                if (loadOBJ(currentObjFile, currentObjFile, &meuModelo) == 0) {
+                if (loadOBJ(currentObjFile, currentMtlFile, &meuModelo) == 0) {
                     fprintf(stderr, "Erro ao recarregar modelo OBJ/MTL\n");
                     
                     // Fallback para terreno Perlin
