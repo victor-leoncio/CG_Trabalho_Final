@@ -713,6 +713,8 @@ void Teclado (unsigned char key, int x, int y)
                     generateMountainousTerrain(&meuModelo, params_fallback);
                     usePerlinTerrain = GL_TRUE;
                 } else {
+                    // IMPORTANTE: Reconstruir adjacência após recarregar o modelo OBJ
+                    buildAdjacency(&meuModelo);
                     printf("Terreno OBJ ativado\n");
                 }
             }
