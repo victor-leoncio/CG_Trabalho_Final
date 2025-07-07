@@ -338,20 +338,17 @@ void Desenha(void)
     glViewport(mainWidth, 0, sideWidth, halfHeight);
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
-
-    // Vista lateral ortográfica em wireframe
-    eye_x_wireframe = 0;
-    eye_y_wireframe = 0;
-    eye_z_wireframe = 200;
     
-    gluLookAt(eye_x_wireframe, eye_y_wireframe, eye_z_wireframe,
-              0, 0, 0,
-              0, 1, 0);
+    // Vista lateral com ênfase no eixo X (raio)
+    gluLookAt(210, 50, 0,   // Posição da câmera
+              -100000000, 0, 0,     // Ponto de interesse
+              0, 1, 0);    // Orientação vertical
 
     // Renderizar em wireframe
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     glDisable(GL_LIGHTING);
     glColor3f(1.0f, 1.0f, 1.0f);  // Cor branca para wireframe
+    glLineWidth(0.1f);  // Linhas um pouco mais grossas para melhor visibilidade
     
     glPushMatrix();
     glScalef(scale, scale, scale);
@@ -395,11 +392,11 @@ void Desenha(void)
         glColor3f(1.0f, 0.0f, 0.0f);
         glutSolidSphere(2.0f, 20, 20);
         glPopMatrix();
-    }
+    } 
 
 	glFlush();
-	glutSwapBuffers();
- }
+	glutSwapBuffers(); 
+	}
 
 
 void Inicializa (void)
@@ -413,8 +410,8 @@ void Inicializa (void)
 	GLint especMaterial = 60;
 
     //glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-    // Mudar para azul mais escuro (para combinar com o gradiente)
-    glClearColor(0.0f, 0.35f, 0.5f, 1.0f); // Azul marinho 
+    // Usar a mesma cor de fundo da viewport principal (azul escuro do gradiente)
+    glClearColor(0.0f, 0.35f, 0.5f, 1.0f); // Azul marinho
     glShadeModel(GL_SMOOTH);
 	glMaterialfv(GL_FRONT,GL_SPECULAR, especularidade);
 	glMateriali(GL_FRONT,GL_SHININESS,especMaterial);
@@ -460,7 +457,7 @@ void Inicializa (void)
     //glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
     eye_x = 200;
-    eye_y = 10;
+    eye_y = 70;
     eye_z = 0;
     //center_x = -1000000000;
     center_x = center_y = center_z = 0;
