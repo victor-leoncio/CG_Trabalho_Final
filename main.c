@@ -242,8 +242,15 @@ void Desenha(void)
 {
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // Viewport principal
+    // Viewport principal - PERSPECTIVE PROJECTION
     glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+    
+    // Set perspective projection for main viewport
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluPerspective(60, fAspect, 0.5, 1000);
+    glGetDoublev(GL_PROJECTION_MATRIX, projection);
+    
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
@@ -301,6 +308,13 @@ void Desenha(void)
     int halfHeight = winHeight / 2;
 
     glViewport(mainWidth, halfHeight, sideWidth, halfHeight);
+    
+    // Set perspective projection for upper right viewport
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    GLfloat aspectRatio = (GLfloat)sideWidth / (GLfloat)halfHeight;
+    gluPerspective(60, aspectRatio, 0.5, 1000);
+    
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
 
@@ -334,8 +348,17 @@ void Desenha(void)
     }
     glPopMatrix();
 
-    // Viewport inferior direita (wireframe)
+    // Viewport inferior direita (wireframe) - ORTHOGRAPHIC PROJECTION
     glViewport(mainWidth, 0, sideWidth, halfHeight);
+    
+    // Set orthographic projection for lower right viewport (3rd viewport)
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    GLfloat orthoSize = 150.0f;
+    GLfloat orthoAspect = (GLfloat)sideWidth / (GLfloat)halfHeight;
+    glOrtho(-orthoSize * orthoAspect, orthoSize * orthoAspect,
+            -orthoSize, orthoSize, 1, 1000);
+    
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     
@@ -472,12 +495,8 @@ void EspecificaParametrosVisualizacao(void)
 	glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
 
-    if (ortho) {
-        GLfloat s = 100;
-        glOrtho(-s*fAspect, s*fAspect, -s, s, 1, 1000);
-    } else { 
-        gluPerspective(60,fAspect,0.5,1000);
-    }
+    // Main viewport always uses perspective
+    gluPerspective(60,fAspect,0.5,1000);
     
     // Atualizar matriz de projeção
     glGetDoublev(GL_PROJECTION_MATRIX, projection);
@@ -616,10 +635,6 @@ void Teclado (unsigned char key, int x, int y)
 
         case 'g':
             eye_y -= 1.0f;
-            break;
-        
-        case 'p':
-            ortho = !ortho;
             break;
 
         case 'n':
