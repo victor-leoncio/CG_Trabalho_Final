@@ -15,6 +15,9 @@ ObjModel meuModelo;
 GLboolean ortho = GL_FALSE;
 GLboolean usePerlinTerrain = GL_FALSE;
 
+char currentObjFile[256] = "scene.obj";
+char currentMtlFile[256] = "scene.mtl";
+
 // Novas variáveis para câmeras adicionais
 GLfloat eye_x_ball, eye_y_ball, eye_z_ball;
 GLfloat center_x_ball, center_y_ball, center_z_ball;
@@ -482,7 +485,7 @@ void Inicializa (void)
     glEnable(GL_RESCALE_NORMAL);
     
     // Load OBJ terrain by default
-    if (loadOBJ("scene.obj", "scene.mtl", &meuModelo) == 0) {
+    if (loadOBJ(currentObjFile, currentMtlFile, &meuModelo) == 0) {
         fprintf(stderr, "Erro ao carregar modelo OBJ/MTL\n");
         exit(1);
     }
@@ -695,7 +698,7 @@ void Teclado (unsigned char key, int x, int y)
                 meuModelo.textures = NULL;
                 meuModelo.adjacency = NULL;
                 
-                if (loadOBJ("scene.obj", "scene.mtl", &meuModelo) == 0) {
+                if (loadOBJ(currentObjFile, currentObjFile, &meuModelo) == 0) {
                     fprintf(stderr, "Erro ao recarregar modelo OBJ/MTL\n");
                     
                     // Fallback para terreno Perlin
