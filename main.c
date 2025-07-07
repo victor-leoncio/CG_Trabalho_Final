@@ -48,6 +48,8 @@ GLboolean showPath = GL_TRUE;
 GLboolean continuousAnimation = GL_TRUE;
 int animationSpeed = 100; // ms
 
+// Variável para controlar rotação da 3ª viewport
+int wireframeRotation = 0; // 0=frente, 1=direita, 2=trás, 3=esquerda
 
 // Função timer
 void Timer(int value) {
@@ -362,10 +364,35 @@ void Desenha(void)
     glMatrixMode(GL_MODELVIEW);
     glLoadIdentity();
     
-    // Vista lateral com ênfase no eixo X (raio)
-    gluLookAt(210, 50, 0,   // Posição da câmera
-              -100000000, 0, 0,     // Ponto de interesse
-              0, 1, 0);    // Orientação vertical
+    // Configurar câmera baseada na rotação atual
+    GLfloat camX, camY, camZ;
+    GLfloat centerX, centerY, centerZ;
+    
+    camY = 50.0f;  // Altura fixa
+    centerY = 0.0f;
+    
+    switch(wireframeRotation) {
+        case 0: // Frente (vista do eixo Z positivo)
+            camX = 0; camZ = 210;
+            centerX = 0; centerZ = 0;
+            break;
+        case 1: // Direita (vista do eixo X positivo)
+            camX = 210; camZ = 0;
+            centerX = 0; centerZ = 0;
+            break;
+        case 2: // Trás (vista do eixo Z negativo)
+            camX = 0; camZ = -210;
+            centerX = 0; centerZ = 0;
+            break;
+        case 3: // Esquerda (vista do eixo X negativo)
+            camX = -210; camZ = 0;
+            centerX = 0; centerZ = 0;
+            break;
+    }
+    
+    gluLookAt(camX, camY, camZ,      // Posição da câmera
+              centerX, centerY, centerZ,  // Ponto de interesse
+              0, 1, 0);              // Orientação vertical
 
     // Renderizar em wireframe
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -520,6 +547,8 @@ void EspecificaParametrosVisualizacao(void)
     puts("DIGITE A TECLA 'g' PARA DESCER A CAMERA");
     puts("DIGITE A TECLA 'p' PARA ALTERNAR O MODO DE PROJEÇÃO");
     puts("DIGITE A TECLA 'n' PARA ALTERNAR ENTRE TERRENO OBJ E PERLIN NOISE");
+    puts("DIGITE A TECLA 'z' PARA ROTACIONAR 3ª VIEWPORT (SENTIDO HORÁRIO)");
+    puts("DIGITE A TECLA 'x' PARA ROTACIONAR 3ª VIEWPORT (SENTIDO ANTI-HORÁRIO)");
     puts("DIGITE A TECLA 'r' PARA RESETAR");
 }
 
@@ -722,6 +751,30 @@ void Teclado (unsigned char key, int x, int y)
             
         case 'v': // Alternar visualização do caminho
             showPath = !showPath;
+            glutPostRedisplay();
+            break;
+            
+        case 'z': // Rotacionar 3ª viewport no sentido horário
+            wireframeRotation = (wireframeRotation + 1) % 4;
+            printf("3ª Viewport rotacionada para posição %d ", wireframeRotation);
+            switch(wireframeRotation) {
+                case 0: printf("(Frente)\n"); break;
+                case 1: printf("(Direita)\n"); break;
+                case 2: printf("(Trás)\n"); break;
+                case 3: printf("(Esquerda)\n"); break;
+            }
+            glutPostRedisplay();
+            break;
+            
+        case 'x': // Rotacionar 3ª viewport no sentido anti-horário
+            wireframeRotation = (wireframeRotation - 1 + 4) % 4;
+            printf("3ª Viewport rotacionada para posição %d ", wireframeRotation);
+            switch(wireframeRotation) {
+                case 0: printf("(Frente)\n"); break;
+                case 1: printf("(Direita)\n"); break;
+                case 2: printf("(Trás)\n"); break;
+                case 3: printf("(Esquerda)\n"); break;
+            }
             glutPostRedisplay();
             break;
     }
