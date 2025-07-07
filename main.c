@@ -500,16 +500,9 @@ void Inicializa (void)
     gluLookAt(eye_x, eye_y, eye_z, center_x, center_y, center_z, up_x, up_y, up_z);
     glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
 
-    // Salvar matrizes iniciais
-    //glMatrixMode(GL_PROJECTION);
-    //glGetDoublev(GL_PROJECTION_MATRIX, projection);
-    //glMatrixMode(GL_MODELVIEW);
-    //glGetDoublev(GL_MODELVIEW_MATRIX, modelview);
-
     eye_x = 200;
     eye_y = 70;
     eye_z = 0;
-    //center_x = -1000000000;
     center_x = center_y = center_z = 0;
     up_x = 0;
     up_y = 1;
@@ -718,7 +711,6 @@ void Teclado (unsigned char key, int x, int y)
                     usePerlinTerrain = GL_TRUE;
                 } else {
                     printf("Terreno OBJ ativado\n");
-                    buildAdjacency(&meuModelo);
                 }
             }
             break;
